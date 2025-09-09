@@ -52,7 +52,20 @@ static bool ScriptPathComparator(const LuaScript& first, const LuaScript& second
     return first.filepath < second.filepath;
 }
 
-bool EclipseStateManager::RunFromCache(sol::state& solState, const std::string& filePath, uint32& compiledCount, uint32& cachedCount)
+static void RegisterScriptResult(sol::table& modules, const std::string& filename, const sol::protected_function_result& result)
+{
+    sol::object script_result = result.get<sol::object>();
+    if (script_result == sol::lua_nil || (script_result.is<bool>() && !script_result.as<bool>()))
+    {
+        modules[filename] = true;
+    }
+    else
+    {
+        modules[filename] = script_result;
+    }
+}
+
+bool EclipseStateManager::RunFromCache(sol::state& solState, const std::string& filePath, sol::table& modules, const std::string& filename, uint32& compiledCount, uint32& cachedCount)
 {
     auto& cache = EclipseCache::GetInstance();
 
@@ -81,11 +94,12 @@ bool EclipseStateManager::RunFromCache(sol::state& solState, const std::string& 
         return false;
     }
 
+    RegisterScriptResult(modules, filename, result);
     cachedCount++;
     return true;
 }
 
-bool EclipseStateManager::RunFromFile(sol::state& solState, const std::string& filePath)
+bool EclipseStateManager::RunFromFile(sol::state& solState, const std::string& filePath, sol::table& modules, const std::string& filename)
 {
     sol::load_result loaded_script = solState.load_file(filePath);
     if (!loaded_script.valid())
@@ -103,6 +117,7 @@ bool EclipseStateManager::RunFromFile(sol::state& solState, const std::string& f
         return false;
     }
 
+    RegisterScriptResult(modules, filename, result);
     return true;
 }
 
@@ -134,6 +149,8 @@ void EclipseStateManager::RunAllScripts()
         return;
 
     sol::state& solState = globalState->GetState();
+    sol::table package = solState["package"];
+    sol::table modules = package["loaded"];
 
     for (const auto& script : scripts)
     {
@@ -149,12 +166,12 @@ void EclipseStateManager::RunAllScripts()
         loaded[script.filename] = script.filepath;
         bool success = false;
 
-        if (cacheEnabled && RunFromCache(solState, script.filepath, compiledCount, cachedCount))
+        if (cacheEnabled && RunFromCache(solState, script.filepath, modules, script.filename, compiledCount, cachedCount))
         {
             ECLIPSE_LOG_DEBUG("[Eclipse]: Successfully loaded from cache `{}`", script.filepath);
             success = true;
         }
-        else if (RunFromFile(solState, script.filepath))
+        else if (RunFromFile(solState, script.filepath, modules, script.filename))
         {
             ECLIPSE_LOG_DEBUG("[Eclipse]: Successfully loaded `{}`", script.filepath);
             success = true;

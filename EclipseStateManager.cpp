@@ -120,7 +120,7 @@ void EclipseStateManager::RunAllScripts()
                 modules[script.filename] = script_result;
             }
 
-            ECLIPSE_LOG_INFO("[Eclipse]: Successfully loaded `{}`", script.filepath);
+            ECLIPSE_LOG_DEBUG("[Eclipse]: Successfully loaded `{}`", script.filepath);
             ++count;
         }
     }

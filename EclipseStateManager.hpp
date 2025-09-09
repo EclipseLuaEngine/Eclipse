@@ -24,6 +24,10 @@ class EclipseStateManager
         EclipseStateManager& operator=(const EclipseStateManager&) = delete;
 
         std::unordered_map<int32, std::unique_ptr<EclipseSolState>> _states;
+
+    protected:
+        bool RunFromCache(sol::state& solState, const std::string& filePath, uint32& compiledCount, uint32& cachedCount);
+        bool RunFromFile(sol::state& solState, const std::string& filePath);
 };
 
 

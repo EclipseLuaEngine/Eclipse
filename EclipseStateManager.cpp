@@ -1,3 +1,5 @@
+#include "EclipseCache.hpp"
+#include "EclipseCompiler.hpp"
 #include "EclipseStateManager.hpp"
 #include "EclipseScriptLoader.hpp"
 #include "EclipseIncludes.hpp"
@@ -50,6 +52,60 @@ static bool ScriptPathComparator(const LuaScript& first, const LuaScript& second
     return first.filepath < second.filepath;
 }
 
+bool EclipseStateManager::RunFromCache(sol::state& solState, const std::string& filePath, uint32& compiledCount, uint32& cachedCount)
+{
+    auto& cache = EclipseCache::GetInstance();
+
+    if (!cache.IsInCache(filePath))
+        return false;
+
+    std::optional<sol::bytecode> bytecode = cache.GetBytecode(filePath);
+    if (cache.IsScriptModified(filePath))
+    {
+        bytecode = EclipseCompiler::CompileLuaToByteCode(solState, filePath);
+        if (bytecode.has_value())
+        {
+            cache.StoreByteCode(filePath, bytecode.value(), true);
+            compiledCount++;
+        }
+    }
+
+    if (!bytecode.has_value())
+        return false;
+
+    auto result = solState.safe_script(bytecode->as_string_view());
+    if (!result.valid())
+    {
+        sol::error err = result;
+        ECLIPSE_LOG_ERROR("[Eclipse]: Error executing cached `{}`: {}", filePath, err.what());
+        return false;
+    }
+
+    cachedCount++;
+    return true;
+}
+
+bool EclipseStateManager::RunFromFile(sol::state& solState, const std::string& filePath)
+{
+    sol::load_result loaded_script = solState.load_file(filePath);
+    if (!loaded_script.valid())
+    {
+        sol::error err = loaded_script;
+        ECLIPSE_LOG_ERROR("[Eclipse]: Error loading `{}`: {}", filePath, err.what());
+        return false;
+    }
+
+    sol::protected_function_result result = loaded_script();
+    if (!result.valid())
+    {
+        sol::error err = result;
+        ECLIPSE_LOG_ERROR("[Eclipse]: Error executing `{}`: {}", filePath, err.what());
+        return false;
+    }
+
+    return true;
+}
+
 void EclipseStateManager::RunAllScripts()
 {
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -70,16 +126,14 @@ void EclipseStateManager::RunAllScripts()
     scripts.insert(scripts.end(), lua_extensions.begin(), lua_extensions.end());
     scripts.insert(scripts.end(), lua_scripts.begin(), lua_scripts.end());
 
-    std::unordered_map<std::string, std::string> loaded; // filename, path
-
+    std::unordered_map<std::string, std::string> loaded;
+    loaded.reserve(scripts.size());
 
     EclipseSolState* globalState = GetGlobalState();
-    if(!globalState->IsInitialized())
+    if (!globalState->IsInitialized())
         return;
 
     sol::state& solState = globalState->GetState();
-    sol::table package = solState["package"];
-    sol::table modules = package["loaded"];
 
     for (const auto& script : scripts)
     {
@@ -89,39 +143,33 @@ void EclipseStateManager::RunAllScripts()
             continue;
         }
 
-        sol::load_result loaded_script;
+        if (script.fileext != ".lua" && script.fileext != ".ext")
+            continue;
 
-        if (script.fileext == ".lua" || script.fileext == ".ext")
+        loaded[script.filename] = script.filepath;
+        bool success = false;
+
+        if (cacheEnabled && RunFromCache(solState, script.filepath, compiledCount, cachedCount))
         {
-            loaded_script = solState.load_file(script.filepath);
-            if (!loaded_script.valid())
-            {
-                sol::error err = loaded_script;
-                ECLIPSE_LOG_ERROR("[Eclipse]: Error loading `{}`: {}", script.filepath, err.what());
-                continue;
-            }
-
-            sol::protected_function_result result = loaded_script();
-
-            if (!result.valid())
-            {
-                sol::error err = result;
-                ECLIPSE_LOG_ERROR("[Eclipse]: Error executing `{}`: {}", script.filepath, err.what());
-                continue;
-            }
-
-            sol::object script_result = result.get<sol::object>();
-            if (script_result == sol::lua_nil || (script_result.is<bool>() && !script_result.as<bool>()))
-            {
-                modules[script.filename] = true;
-            }
-            else
-            {
-                modules[script.filename] = script_result;
-            }
-
-            ECLIPSE_LOG_DEBUG("[Eclipse]: Successfully loaded `{}`", script.filepath);
-            ++count;
+            ECLIPSE_LOG_DEBUG("[Eclipse]: Successfully loaded from cache `{}`", script.filepath);
+            success = true;
         }
+        else if (RunFromFile(solState, script.filepath))
+        {
+            ECLIPSE_LOG_DEBUG("[Eclipse]: Successfully loaded `{}`", script.filepath);
+            success = true;
+        }
+
+        if (success)
+            ++count;
     }
+
+    std::string details = "";
+    if (cacheEnabled && (compiledCount > 0 || cachedCount > 0 || precompiledCount > 0))
+    {
+        details = fmt::format("({} compiled, {} cached, {} pre-compiled)", compiledCount, cachedCount, precompiledCount);
+    }
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
+    ECLIPSE_LOG_INFO("[Eclipse]: Executed {} Lua scripts in {} µs {}", count, static_cast<uint32>(duration), details);
 }

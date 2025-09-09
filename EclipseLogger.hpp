@@ -1,20 +1,7 @@
 #ifndef ECLIPSE_LOGGER_HPP
 #define ECLIPSE_LOGGER_HPP
 
-#include <unordered_map>
-#include <unordered_set>
-#include <mutex>
-#include <memory>
-#include "Common.h"
-#include "SharedDefines.h"
-#include "ObjectGuid.h"
-#include "Database/QueryResult.h"
 #include "Log.h"
-
-#include <string>
-#include <string_view>
-#include <memory>
-
 
 class EclipseLogger
 {

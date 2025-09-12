@@ -7,11 +7,18 @@ struct CacheEntry
 {
     sol::bytecode bytecode;
     std::time_t last_modified;
-    bool success;
 
     CacheEntry() : last_modified(0) {}
-    CacheEntry(const sol::bytecode& code, std::time_t modTime, bool success = false)
-        : bytecode(code), last_modified(modTime), success(success) {}
+    CacheEntry(const sol::bytecode& code, std::time_t modTime)
+        : bytecode(code), last_modified(modTime) {}
+};
+
+enum EclipseScriptCacheState
+{
+    SCRIPT_CACHE_NONE = 0,
+    SCRIPT_CACHE_REINIT = 1,
+    SCRIPT_CACHE_LOADING = 2,
+    SCRIPT_CACHE_READY = 3
 };
 
 class EclipseCache
@@ -20,7 +27,7 @@ class EclipseCache
         static EclipseCache& GetInstance();
 
         std::optional<sol::bytecode> GetBytecode(const std::string& filePath);
-        void StoreByteCode(const std::string& filePath, sol::bytecode bytecode, bool success = true);
+        void StoreByteCode(const std::string& filePath, sol::bytecode bytecode);
 
         CacheEntry& GetCacheEntry(const std::string& filePath) { return _cache[filePath]; }
 
@@ -36,6 +43,9 @@ class EclipseCache
         void InvalidateScript(const std::string& filePath);
         void InvalidateAllScripts();
 
+        uint8 GetCacheState() { return _cacheState; }
+        void SetCacheState(uint8 cacheState) { _cacheState = cacheState; }
+
     private:
         EclipseCache() = default;
         ~EclipseCache() = default;
@@ -44,6 +54,7 @@ class EclipseCache
 
     private:
         std::unordered_map<std::string, CacheEntry> _cache;
+        std::atomic<uint8> _cacheState;
 };
 
 #endif //ECLIPSE_LUA_CACHE_HPP

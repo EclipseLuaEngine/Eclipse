@@ -12,10 +12,11 @@ class EclipseStateManager
     public:
         static EclipseStateManager& GetInstance();
 
-        EclipseSolState* GetGlobalState();
-        EclipseSolState* GetStateForMap(int32 mapId);
+        EclipseSolState* CreateState(Map* map);
 
-        void RunAllScripts();
+        EclipseSolState* GetGlobalState() { return _states[-1].get(); };
+        EclipseSolState* GetStateByMap(Map* map) { return _states[map->GetId()].get();  }
+        EclipseSolState* GetStateByMapId(int32 mapId) { return _states[mapId].get(); }
 
     private:
         EclipseStateManager() = default;

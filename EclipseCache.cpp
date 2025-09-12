@@ -48,9 +48,6 @@ std::optional<sol::bytecode> EclipseCache::GetBytecode(const std::string& filePa
         return std::nullopt;
     }
 
-    if(!cacheEntry.success)
-        return std::nullopt;
-
     return cacheEntry.bytecode;
 }
 
@@ -60,10 +57,10 @@ void EclipseCache::InvalidateScript(const std::string& filePath)
     ECLIPSE_LOG_INFO("[Eclipse]: Invalidated cache for script: {}", filePath);
 }
 
-void EclipseCache::StoreByteCode(const std::string& filePath, sol::bytecode bytecode, bool success)
+void EclipseCache::StoreByteCode(const std::string& filePath, sol::bytecode bytecode)
 {
     std::time_t modTime = GetFileWriteTime(filePath);
-    _cache[filePath] = CacheEntry(std::move(bytecode), modTime, success);
+    _cache[filePath] = CacheEntry(std::move(bytecode), modTime);
 }
 
 void EclipseCache::InvalidateAllScripts()

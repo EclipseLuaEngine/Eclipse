@@ -10,18 +10,21 @@
 class EclipseSolState
 {
     public:
-        EclipseSolState();
+        EclipseSolState(Map* map);
         ~EclipseSolState() = default;
 
-        bool Initialize(int32 mapId = -1);
+        bool Initialize();
         bool IsInitialized() const;
 
-        int32 GetStateMapId() const { return _stateMapId; }
+        void RunScripts();
+
         sol::state& GetState() { return _solState; }
         const sol::state& GetState() const { return _solState; }
 
+        const Map* GetMap() const { return _map; }
+
     private:
-        int32 _stateMapId;
+        Map* const _map;
         sol::state _solState;
         bool _isInitialized;
 };

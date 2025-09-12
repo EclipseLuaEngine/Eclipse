@@ -1,34 +1,38 @@
 #ifndef ECLIPSE_SCRIPT_LOADER_HPP
 #define ECLIPSE_SCRIPT_LOADER_HPP
 
+#include "EclipseIncludes.hpp"
 #include <boost/filesystem.hpp>
 
 struct LuaScript
 {
-    std::string fileext;
-    std::string filename;
-    std::string filepath;
-    std::string modulepath;
-    LuaScript() {}
+    std::string fileExt;
+    std::string fileName;
+    std::string filePath;
+
+    LuaScript() = default;
+    LuaScript(std::string ext, std::string name, std::string path)
+        : fileExt(std::move(ext)), fileName(std::move(name)), filePath(std::move(path)) {}
 };
 
 class EclipseScriptLoader
 {
     public:
-        typedef std::list<LuaScript> ScriptList;
+        typedef std::unordered_map<std::string, LuaScript> ScriptMap;
 
         static bool IsValidScriptExtension(std::string& extension);
 
         static bool LoadScriptPaths();
-        static void AddScriptPath(std::string filename, const std::string& fullpath);
-        static void GetScripts(const std::string& path);
+        static void ProcessScript(sol::state& tempstate, const std::string& filename, const std::string& fullpath);
+        static void GetScripts(sol::state& tempState, const std::string& path);
 
-        static std::string GetLuaRequirePath()              { return lua_requirepath; }
-        static std::string GetLuaRequireCPath()             { return lua_requirecpath; }
-        static std::string GetLuaFolderPath()               { return lua_folderpath; }
-        static std::string GetLuaRequirePreCompiledPath()   { return lua_precompiledpath; }
-        static ScriptList GetLuaScripts()                   { return lua_scripts; }
-        static ScriptList GetLuaExtensions()                { return lua_extensions; }
+        static bool CompileScript(sol::state& tempState, LuaScript& script);
+
+        static const std::string& GetLuaRequirePath()       { return lua_requirepath; }
+        static const std::string& GetLuaRequireCPath()      { return lua_requirecpath; }
+        static const std::string& GetLuaFolderPath()        { return lua_folderpath; }
+        static const ScriptMap& GetLuaExtensionsMap()       { return lua_extensionsMap; }
+        static const ScriptMap& GetLuaScriptsMap()          { return lua_scriptsMap; }
 
         static void ClearLuaScriptPaths();
 
@@ -41,10 +45,9 @@ class EclipseScriptLoader
         static std::string lua_folderpath;
         static std::string lua_requirepath;
         static std::string lua_requirecpath;
-        static std::string lua_precompiledpath;
 
-        static ScriptList lua_scripts;
-        static ScriptList lua_extensions;
+        static ScriptMap lua_extensionsMap;
+        static ScriptMap lua_scriptsMap;
 };
 
 #endif // ECLIPSE_SCRIPT_LOADER_HPP
